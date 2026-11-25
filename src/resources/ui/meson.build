@@ -43,9 +43,15 @@ foreach name : blueprint_names
   ui_files += [name + '.ui']
 endforeach
 
+blueprint_command = [blueprint_cmd, 'batch-compile', '--minify', meson.current_build_dir(), '@CURRENT_SOURCE_DIR@', '@INPUT@']
+if host_machine.system() == 'darwin'
+  # Show Command-based shortcuts in menus and the shortcuts dialog
+  blueprint_command = [macos_shortcuts, 'wrap', meson.current_build_dir(), '--'] + blueprint_command
+endif
+
 blueprints = custom_target('blueprints',
   input: files(blueprint_files),
   # This is the reason this file exists separately. output doesn't accept path separators
   output: ui_files,
-  command: [blueprint_cmd, 'batch-compile', '--minify', meson.current_build_dir(), '@CURRENT_SOURCE_DIR@', '@INPUT@'],
+  command: blueprint_command,
 )

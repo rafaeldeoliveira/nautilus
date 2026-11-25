@@ -21,6 +21,7 @@
  */
 
 #include "nautilus-toolbar.h"
+#include "nautilus-shortcuts.h"
 
 #include <glib/gi18n.h>
 #include <math.h>
@@ -268,7 +269,7 @@ nautilus_toolbar_init (NautilusToolbar *self)
 
 #define ADD_SHORTCUT_FOR_ACTION(controller, action, trigger) \
         (gtk_shortcut_controller_add_shortcut ((controller), \
-                                               gtk_shortcut_new (gtk_shortcut_trigger_parse_string ((trigger)), \
+                                               gtk_shortcut_new (nautilus_shortcut_trigger_parse ((trigger)), \
                                                                  gtk_named_action_new ((action)))))
 
     ADD_SHORTCUT_FOR_ACTION (shortcuts, "toolbar.edit-location", "<control>l|Go|OpenURL");

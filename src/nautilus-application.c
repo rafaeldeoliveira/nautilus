@@ -28,6 +28,7 @@
 #include <config.h>
 
 #include "nautilus-application.h"
+#include "nautilus-shortcuts.h"
 
 #include <adwaita.h>
 #include <fcntl.h>
@@ -138,9 +139,10 @@ nautilus_application_set_accelerator (GApplication *app,
                                       const gchar  *action_name,
                                       const gchar  *accel)
 {
+    g_autofree char *platform_accel = nautilus_shortcut_for_platform (accel);
     const gchar *vaccels[] =
     {
-        accel,
+        platform_accel,
         NULL
     };
 
@@ -152,7 +154,22 @@ nautilus_application_set_accelerators (GApplication  *app,
                                        const gchar   *action_name,
                                        const gchar  **accels)
 {
-    gtk_application_set_accels_for_action (GTK_APPLICATION (app), action_name, accels);
+    g_autoptr (GStrvBuilder) builder = g_strv_builder_new ();
+    g_auto (GStrv) platform_accels = NULL;
+
+    for (guint i = 0; accels[i] != NULL; i++)
+    {
+        g_autofree char *accel = nautilus_shortcut_for_platform (accels[i]);
+
+        if (accel != NULL)
+        {
+            g_strv_builder_add (builder, accel);
+        }
+    }
+
+    platform_accels = g_strv_builder_end (builder);
+    gtk_application_set_accels_for_action (GTK_APPLICATION (app), action_name,
+                                           (const gchar **) platform_accels);
 }
 
 GList *

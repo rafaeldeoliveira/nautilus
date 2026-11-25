@@ -7,6 +7,7 @@
 #include <glib/gi18n.h>
 
 #include "nautilus-rename-file-popover.h"
+#include "nautilus-shortcuts.h"
 
 #include "nautilus-directory.h"
 #include "nautilus-filename-validator.h"
@@ -131,7 +132,7 @@ on_event_controller_key_key_pressed (GtkEventControllerKey *controller,
     {
         return name_entry_on_f2_pressed (widget, self);
     }
-    else if (keyval == GDK_KEY_z && (state & GDK_CONTROL_MASK) != 0)
+    else if (keyval == GDK_KEY_z && (state & NAUTILUS_PRIMARY_MASK) != 0)
     {
         return name_entry_on_undo (widget, self);
     }

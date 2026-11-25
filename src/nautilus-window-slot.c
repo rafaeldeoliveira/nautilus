@@ -23,6 +23,7 @@
 #include "config.h"
 
 #include "nautilus-window-slot.h"
+#include "nautilus-shortcuts.h"
 
 #include "nautilus-application.h"
 #include "nautilus-bookmark.h"
@@ -1246,7 +1247,7 @@ set_back_forward_accelerators (NautilusWindowSlot *self)
 
 #define ADD_SHORTCUT_FOR_ACTION(controller, action, trigger) \
         (gtk_shortcut_controller_add_shortcut ((controller), \
-                                               gtk_shortcut_new (gtk_shortcut_trigger_parse_string ((trigger)), \
+                                               gtk_shortcut_new (nautilus_shortcut_trigger_parse ((trigger)), \
                                                                  gtk_named_action_new ((action)))))
 
     ADD_SHORTCUT_FOR_ACTION (self->shortcuts, "slot.back", ltr ? "<alt>Left|Back" : "<alt>Right|Back");
@@ -1326,11 +1327,11 @@ nautilus_window_slot_init (NautilusWindowSlot *self)
 
 #define ADD_SHORTCUT_FOR_ACTION(controller, action, trigger) \
         (gtk_shortcut_controller_add_shortcut ((controller), \
-                                               gtk_shortcut_new (gtk_shortcut_trigger_parse_string ((trigger)), \
+                                               gtk_shortcut_new (nautilus_shortcut_trigger_parse ((trigger)), \
                                                                  gtk_named_action_new ((action)))))
 #define ADD_SHORTCUT_FOR_ACTION_WITH_ARGS(controller, action, trigger, format_string, ...) \
         (gtk_shortcut_controller_add_shortcut ((controller), \
-                                               gtk_shortcut_new_with_arguments (gtk_shortcut_trigger_parse_string ((trigger)), \
+                                               gtk_shortcut_new_with_arguments (nautilus_shortcut_trigger_parse ((trigger)), \
                                                                                 gtk_named_action_new ((action)), \
                                                                                 (format_string), \
                                                                                 __VA_ARGS__)))

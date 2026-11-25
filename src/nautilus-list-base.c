@@ -5,6 +5,7 @@
  */
 
 #include "nautilus-list-base.h"
+#include "nautilus-shortcuts.h"
 #include "nautilus-list-base-private.h"
 
 #include "nautilus-application.h"
@@ -258,7 +259,7 @@ on_item_click_pressed (GtkGestureClick *gesture,
 
     button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gesture));
     modifiers = gtk_event_controller_get_current_event_state (GTK_EVENT_CONTROLLER (gesture));
-    selection_mode = (modifiers & (GDK_CONTROL_MASK | GDK_SHIFT_MASK));
+    selection_mode = (modifiers & (NAUTILUS_PRIMARY_MASK | GDK_SHIFT_MASK));
 
     /* Before anything else, store event state to be read by other handlers. */
     priv->deny_background_click = TRUE;
@@ -377,7 +378,7 @@ on_view_click_pressed (GtkGestureClick *gesture,
      * holding Ctrl and Shift. Also, don't unselect when right clicking. */
     modifiers = gtk_event_controller_get_current_event_state (GTK_EVENT_CONTROLLER (gesture));
     button = gtk_gesture_single_get_current_button (GTK_GESTURE_SINGLE (gesture));
-    selection_mode = (modifiers & (GDK_CONTROL_MASK | GDK_SHIFT_MASK));
+    selection_mode = (modifiers & (NAUTILUS_PRIMARY_MASK | GDK_SHIFT_MASK));
     if (!selection_mode && button != GDK_BUTTON_SECONDARY)
     {
         gtk_selection_model_unselect_all (GTK_SELECTION_MODEL (priv->model));
@@ -1110,7 +1111,7 @@ on_scroll (GtkEventControllerScroll *scroll,
 
     state = gtk_event_controller_get_current_event_state (GTK_EVENT_CONTROLLER (scroll));
 
-    if (state & GDK_CONTROL_MASK)
+    if (state & NAUTILUS_PRIMARY_MASK)
     {
         if (priv->scroll_timeout_id == 0)
         {

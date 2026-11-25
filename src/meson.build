@@ -241,6 +241,8 @@ libnautilus_sources = [
   'nautilus-shell-search-provider.c',
   'nautilus-shortcut-manager.c',
   'nautilus-shortcut-manager.h',
+  'nautilus-shortcuts.c',
+  'nautilus-shortcuts.h',
   'nautilus-sidebar.c',
   'nautilus-sidebar.h',
   'nautilus-sidebar-row.c',

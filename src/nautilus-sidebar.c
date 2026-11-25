@@ -11,6 +11,7 @@
  * nautilus with the GTK4 port in 7bf5ab0c73d5027dbe754df34243054a83ffae1b
  */
 #include "nautilus-sidebar.h"
+#include "nautilus-shortcuts.h"
 
 #include "config.h"
 #include <glib/gi18n.h>
@@ -2676,7 +2677,7 @@ on_key_pressed (GtkEventControllerKey *controller,
             {
                 open_flags = NAUTILUS_OPEN_FLAG_NEW_TAB;
             }
-            else if ((state & modifiers) == GDK_CONTROL_MASK)
+            else if ((state & modifiers) == NAUTILUS_PRIMARY_MASK)
             {
                 open_flags = NAUTILUS_OPEN_FLAG_NEW_WINDOW;
             }
@@ -3213,7 +3214,7 @@ on_row_released (GtkGestureClick    *gesture,
         {
             NautilusOpenFlags open_flags = NAUTILUS_OPEN_FLAG_NORMAL;
 
-            open_flags = (state & GDK_CONTROL_MASK) ?
+            open_flags = (state & NAUTILUS_PRIMARY_MASK) ?
                          NAUTILUS_OPEN_FLAG_NEW_WINDOW :
                          NAUTILUS_OPEN_FLAG_NEW_TAB;
 

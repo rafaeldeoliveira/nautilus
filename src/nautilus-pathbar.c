@@ -23,6 +23,7 @@
 #include <gio/gio.h>
 
 #include "nautilus-pathbar.h"
+#include "nautilus-shortcuts.h"
 #include "nautilus-properties.h"
 
 #include "nautilus-dnd.h"
@@ -727,7 +728,7 @@ on_click_gesture_pressed (GtkGestureClick *gesture,
 
         case GDK_BUTTON_PRIMARY:
         {
-            if (is_browse_mode && (state & GDK_CONTROL_MASK) != 0)
+            if (is_browse_mode && (state & NAUTILUS_PRIMARY_MASK) != 0)
             {
                 g_signal_emit (button_data->path_bar, path_bar_signals[OPEN_LOCATION], 0,
                                button_data->path,

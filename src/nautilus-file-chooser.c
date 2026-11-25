@@ -9,6 +9,7 @@
 #define G_LOG_DOMAIN "nautilus-file-chooser"
 
 #include "nautilus-file-chooser.h"
+#include "nautilus-shortcuts.h"
 
 #include <config.h>
 #include <glib/gi18n.h>
@@ -952,7 +953,7 @@ nautilus_file_chooser_class_init (NautilusFileChooserClass *klass)
     gtk_widget_class_bind_template_callback (widget_class, on_file_drop);
     gtk_widget_class_bind_template_callback (widget_class, get_filter_width_chars);
 
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_e, GDK_CONTROL_MASK,
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_e, NAUTILUS_PRIMARY_MASK,
                                          "chooser.focus-entry", NULL);
     /* This shortcut was provided via a mnemonic by the GTK file chooser */
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_n, GDK_ALT_MASK,

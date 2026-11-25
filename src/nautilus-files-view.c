@@ -27,6 +27,7 @@
 #include <config.h>
 
 #include "nautilus-files-view.h"
+#include "nautilus-shortcuts.h"
 
 #include <gdk/gdk.h>
 #include <gio/gio.h>
@@ -9477,31 +9478,40 @@ nautilus_files_view_class_init (NautilusFilesViewClass *klass)
      * actions active.
      */
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Delete, GDK_NO_MODIFIER_MASK, "view.delete-permanently-menu-item", NULL);
+#ifdef __APPLE__
+    /* Finder's keys: Command-Backspace moves to the trash (or deletes where
+     * there is none), Option-Command-Backspace deletes immediately */
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_BackSpace, GDK_META_MASK, "view.move-to-trash", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_BackSpace, GDK_META_MASK, "view.delete-from-trash", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_BackSpace, GDK_META_MASK, "view.delete-permanently-menu-item", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_BackSpace, GDK_META_MASK | GDK_ALT_MASK, "view.delete-permanently-shortcut", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_BackSpace, GDK_META_MASK | GDK_ALT_MASK, "view.permanent-delete-permanently-menu-item", NULL);
+#endif
 
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_F2, GDK_NO_MODIFIER_MASK, "view.rename", NULL);
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Menu, GDK_NO_MODIFIER_MASK, "view.popup-menu", NULL);
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_F10, GDK_SHIFT_MASK, "view.popup-menu", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_o, GDK_CONTROL_MASK, "view.open-with-default-application", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_o, NAUTILUS_PRIMARY_MASK, "view.open-with-default-application", NULL);
     /* This is not necessary per-se, because it's the default activation
      * keybinding. But in order for it to appear in the context menu as a
      * keyboard shortcut, we need to bind it to the menu item action here. */
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Return, GDK_NO_MODIFIER_MASK, "view.open-with-default-application", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_i, GDK_CONTROL_MASK, "view.properties", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_i, NAUTILUS_PRIMARY_MASK, "view.properties", NULL);
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Return, GDK_ALT_MASK, "view.properties", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_a, GDK_CONTROL_MASK, "view.select-all", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_i, GDK_CONTROL_MASK | GDK_SHIFT_MASK, "view.invert-selection", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, GDK_CONTROL_MASK, "view.create-link", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, GDK_CONTROL_MASK, "view.create-link-shortcut", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, GDK_CONTROL_MASK | GDK_SHIFT_MASK, "view.create-link-in-place", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, GDK_CONTROL_MASK | GDK_SHIFT_MASK, "view.create-link-in-place-shortcut", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Return, GDK_CONTROL_MASK, "view.open-item-new-tab", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_a, NAUTILUS_PRIMARY_MASK, "view.select-all", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_i, NAUTILUS_PRIMARY_MASK | GDK_SHIFT_MASK, "view.invert-selection", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, NAUTILUS_PRIMARY_MASK, "view.create-link", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, NAUTILUS_PRIMARY_MASK, "view.create-link-shortcut", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, NAUTILUS_PRIMARY_MASK | GDK_SHIFT_MASK, "view.create-link-in-place", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_m, NAUTILUS_PRIMARY_MASK | GDK_SHIFT_MASK, "view.create-link-in-place-shortcut", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Return, NAUTILUS_PRIMARY_MASK, "view.open-item-new-tab", NULL);
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Return, GDK_SHIFT_MASK, "view.open-item-new-window", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_o, GDK_CONTROL_MASK | GDK_ALT_MASK, "view.open-item-location", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_o, NAUTILUS_PRIMARY_MASK | GDK_ALT_MASK, "view.open-item-location", NULL);
     gtk_widget_class_add_binding_action (widget_class, GDK_KEY_Insert, GDK_CONTROL_MASK, "view.copy", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_c, GDK_CONTROL_MASK, "view.copy", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_v, GDK_CONTROL_MASK, "view.paste", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_x, GDK_CONTROL_MASK, "view.cut", NULL);
-    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_c, GDK_CONTROL_MASK, "view.copy-network-address", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_c, NAUTILUS_PRIMARY_MASK, "view.copy", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_v, NAUTILUS_PRIMARY_MASK, "view.paste", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_x, NAUTILUS_PRIMARY_MASK, "view.cut", NULL);
+    gtk_widget_class_add_binding_action (widget_class, GDK_KEY_c, NAUTILUS_PRIMARY_MASK, "view.copy-network-address", NULL);
 }
 
 static void
@@ -9619,7 +9629,7 @@ nautilus_files_view_init (NautilusFilesView *self)
      */
 #define ADD_SHORTCUT_FOR_ACTION(controller, action, trigger) \
         (gtk_shortcut_controller_add_shortcut ((controller), \
-                                               gtk_shortcut_new (gtk_shortcut_trigger_parse_string ((trigger)), \
+                                               gtk_shortcut_new (nautilus_shortcut_trigger_parse ((trigger)), \
                                                                  gtk_named_action_new ((action)))))
 
     self->shortcuts = GTK_SHORTCUT_CONTROLLER (gtk_shortcut_controller_new ());

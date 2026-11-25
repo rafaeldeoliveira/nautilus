@@ -1567,6 +1567,14 @@ nautilus_window_init (NautilusWindow *window)
     g_type_ensure (NAUTILUS_TYPE_SHORTCUT_MANAGER);
     gtk_widget_init_template (GTK_WIDGET (window));
 
+#ifdef __APPLE__
+    /* On macOS these are Command-1…9, which switch between list and grid
+     * view here, as in Finder. Tabs are still reachable with Control-Tab. */
+    adw_tab_view_remove_shortcuts (window->tab_view,
+                                   ADW_TAB_VIEW_SHORTCUT_ALT_DIGITS |
+                                   ADW_TAB_VIEW_SHORTCUT_ALT_ZERO);
+#endif
+
     g_signal_connect (window, "notify::maximized",
                       G_CALLBACK (on_is_maximized_changed), NULL);
 
