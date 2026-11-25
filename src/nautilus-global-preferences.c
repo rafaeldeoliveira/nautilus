@@ -109,7 +109,11 @@ nautilus_global_preferences_init (void)
     gnome_lockdown_preferences = g_settings_new ("org.gnome.desktop.lockdown");
     gnome_interface_preferences = g_settings_new ("org.gnome.desktop.interface");
     gnome_privacy_preferences = g_settings_new ("org.gnome.desktop.privacy");
-    localsearch_preferences = g_settings_new ("org.freedesktop.Tracker3.Miner.Files");
+    /* Not installed where localsearch is unavailable (e.g. macOS) */
+    if (check_schema_available ("org.freedesktop.Tracker3.Miner.Files"))
+    {
+        localsearch_preferences = g_settings_new ("org.freedesktop.Tracker3.Miner.Files");
+    }
 
     if (check_schema_available (FILE_SHARING_SCHEMA_ID) &&
         check_schema_available (FILE_SHARING_SERVICE_SCHEMA_ID))

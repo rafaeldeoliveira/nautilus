@@ -189,6 +189,12 @@ proxy_ready (GObject      *object,
     GDBusConnection *connection;
 
     self->proxy = g_dbus_proxy_new_for_bus_finish (res, NULL);
+    if (self->proxy == NULL)
+    {
+        /* No session bus, e.g. on macOS */
+        return;
+    }
+
     get_activatable_names (self);
     connection = g_dbus_proxy_get_connection (self->proxy);
     g_dbus_connection_signal_subscribe (connection,

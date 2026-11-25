@@ -1216,7 +1216,11 @@ update_dbus_opened_locations (NautilusApplication *self)
     g_auto (GVariantBuilder) windows_to_locations_builder = G_VARIANT_BUILDER_INIT (
         G_VARIANT_TYPE ("a{sas}"));
 
-    g_return_if_fail (dbus_object_path != NULL);
+    /* No session bus (e.g. on macOS): nothing to publish */
+    if (dbus_object_path == NULL)
+    {
+        return;
+    }
 
     for (GList *l = self->windows; l != NULL; l = l->next)
     {
