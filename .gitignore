@@ -18,3 +18,4 @@ build/
 /heaptrack.nautilus.*
 _build
 _install
+.DS_Store

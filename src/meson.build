@@ -341,10 +341,16 @@ libnautilus_dep = declare_dependency(
   sources: resources_header
 )
 
+nautilus_main_deps = [libnautilus_dep]
+if host_machine.system() == 'darwin'
+  # To read the language from System Settings
+  nautilus_main_deps += dependency('appleframeworks', modules: ['CoreFoundation'])
+endif
+
 nautilus = executable(
   'nautilus',
   'nautilus-main.c',
-  dependencies: libnautilus_dep,
+  dependencies: nautilus_main_deps,
   install: true
 )
 
