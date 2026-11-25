@@ -119,6 +119,17 @@ server_list_save (GBookmarkFile *bookmarks)
     g_free (filename);
 }
 
+/* Without GVfs (as on macOS) there is no display name to query: name
+ * servers after their host. */
+static char *
+server_title_for_uri (const char *uri)
+{
+    g_autoptr (GUri) parsed = g_uri_parse (uri, G_URI_FLAGS_NONE, NULL);
+    const char *host = parsed != NULL ? g_uri_get_host (parsed) : NULL;
+
+    return g_strdup (host != NULL && host[0] != '\0' ? host : uri);
+}
+
 void
 nautilus_add_recent_server (GFile *file)
 {
@@ -145,7 +156,11 @@ nautilus_add_recent_server (GFile *file)
                               G_FILE_QUERY_INFO_NONE,
                               NULL,
                               &error);
-    title = g_file_info_get_attribute_as_string (info, G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME);
+    title = info != NULL ? g_file_info_get_attribute_as_string (info, G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME) : NULL;
+    if (title == NULL)
+    {
+        title = server_title_for_uri (uri);
+    }
 
     g_bookmark_file_set_title (bookmarks, uri, title);
     now = g_date_time_new_now_utc ();
@@ -159,6 +174,7 @@ nautilus_add_recent_server (GFile *file)
     g_clear_object (&info);
     g_free (title);
     g_free (uri);
+    g_clear_error (&error);
 }
 
 void
@@ -309,6 +325,10 @@ populate_servers_on_idle (gpointer user_data)
         }
 
         g_autofree char *name = g_bookmark_file_get_title (server_list, uri, NULL);
+        if (name == NULL)
+        {
+            name = server_title_for_uri (uri);
+        }
         GDateTime *added = g_bookmark_file_get_added_date_time (server_list, uri, NULL);
         GDateTime *visited = g_bookmark_file_get_visited_date_time (server_list, uri, NULL);
         GDateTime *modified = g_bookmark_file_get_modified_date_time (server_list, uri, NULL);

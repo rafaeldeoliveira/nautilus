@@ -12,6 +12,10 @@
 
 #include "nautilus-recent-servers.h"
 
+#ifdef __APPLE__
+#include "nautilus-macos.h"
+#endif
+
 struct _NautilusNetworkAddressBar
 {
     GtkBox parent_instance;
@@ -152,6 +156,60 @@ pulse_entry_cb (gpointer user_data)
 
 
 static void
+reset_connecting_state (NautilusNetworkAddressBar *self)
+{
+    self->should_pulse_entry = FALSE;
+    gtk_entry_set_progress_fraction (GTK_ENTRY (self->address_entry), 0);
+
+    /* Restore from Cancel to Connect */
+    gtk_button_set_label (GTK_BUTTON (self->connect_button), _("Con_nect"));
+    gtk_widget_set_sensitive (self->address_entry, TRUE);
+    self->connecting_to_server = FALSE;
+}
+
+#ifdef __APPLE__
+/* macOS mounts the share under /Volumes; open that */
+static void
+server_netfs_mount_ready_cb (GObject      *source_object,
+                             GAsyncResult *res,
+                             gpointer      user_data)
+{
+    g_autoptr (NautilusNetworkAddressBar) self = NAUTILUS_NETWORK_ADDRESS_BAR (user_data);
+    g_autoptr (GFile) location = g_object_steal_data (G_OBJECT (self), "netfs-server");
+    g_autoptr (GError) error = NULL;
+    g_autoptr (GFile) mount = nautilus_macos_mount_network_location_finish (res, &error);
+
+    if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+    {
+        /* The Cancel button was clicked, which already reset the bar */
+        return;
+    }
+
+    reset_connecting_state (self);
+
+    if (mount == NULL)
+    {
+        if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED))
+        {
+            show_error_message (self, _("Unable to access location"), error->message);
+        }
+        return;
+    }
+
+    nautilus_add_recent_server (location);
+    gtk_editable_set_text (GTK_EDITABLE (self->address_entry), "");
+
+    if (self->should_open_location)
+    {
+        g_autofree char *uri_to_open = g_file_get_uri (mount);
+
+        gtk_widget_activate_action (GTK_WIDGET (self),
+                                    "slot.open-location", "s", uri_to_open);
+    }
+}
+#endif
+
+static void
 mount_server (NautilusNetworkAddressBar *self,
               GFile                     *location)
 {
@@ -163,6 +221,10 @@ mount_server (NautilusNetworkAddressBar *self,
     /* User cliked when the operation was ongoing, so wanted to cancel it */
     if (self->connecting_to_server)
     {
+#ifdef __APPLE__
+        /* macOS only reports back once its own dialogs are closed */
+        reset_connecting_state (self);
+#endif
         return;
     }
 
@@ -180,6 +242,13 @@ mount_server (NautilusNetworkAddressBar *self,
     {
         self->entry_pulse_timeout_id = g_timeout_add (100, (GSourceFunc) pulse_entry_cb, self);
     }
+
+#ifdef __APPLE__
+    g_object_set_data_full (G_OBJECT (self), "netfs-server", g_object_ref (location), g_object_unref);
+    nautilus_macos_mount_network_location (location, self->cancellable,
+                                           server_netfs_mount_ready_cb, g_object_ref (self));
+    return;
+#endif
 
     g_mount_operation_set_password_save (operation, G_PASSWORD_SAVE_FOR_SESSION);
 
@@ -244,6 +313,10 @@ on_address_entry_text_changed (NautilusNetworkAddressBar *self)
         supported = g_strv_contains (supported_protocols, scheme) &&
                     !g_strv_contains (unsupported_protocols, scheme);
     }
+#ifdef __APPLE__
+    /* Mounted by macOS (NetFS) instead of GVfs */
+    supported = nautilus_macos_is_network_scheme (scheme);
+#endif
 
     gtk_entry_set_icon_from_icon_name (GTK_ENTRY (self->address_entry),
                                        GTK_ENTRY_ICON_SECONDARY,

@@ -24,6 +24,10 @@
 
 #include "nautilus-window-slot.h"
 #include "nautilus-shortcuts.h"
+#ifdef __APPLE__
+#include "nautilus-macos.h"
+#include "nautilus-recent-servers.h"
+#endif
 
 #include "nautilus-application.h"
 #include "nautilus-bookmark.h"
@@ -1506,6 +1510,44 @@ save_selection_for_history (NautilusWindowSlot *self)
  * This is the core function for changing the location of a window. Every change to the
  * location begins here.
  */
+#ifdef __APPLE__
+typedef struct
+{
+    NautilusWindowSlot *slot;
+    GFile *server;
+} NetworkMountData;
+
+static void
+on_network_location_mounted (GObject      *source_object,
+                             GAsyncResult *result,
+                             gpointer      user_data)
+{
+    NetworkMountData *data = user_data;
+    g_autoptr (NautilusWindowSlot) self = data->slot;
+    g_autoptr (GFile) server = data->server;
+    g_autoptr (GError) error = NULL;
+    g_autoptr (GFile) mount = nautilus_macos_mount_network_location_finish (result, &error);
+
+    g_free (data);
+    nautilus_window_slot_set_allow_stop (self, FALSE);
+
+    if (mount == NULL)
+    {
+        if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED))
+        {
+            AdwDialog *dialog = adw_alert_dialog_new (_("Unable to access location"), error->message);
+
+            adw_alert_dialog_add_response (ADW_ALERT_DIALOG (dialog), "close", _("_Close"));
+            adw_dialog_present (dialog, GTK_WIDGET (self));
+        }
+        return;
+    }
+
+    nautilus_add_recent_server (server);
+    nautilus_window_slot_open_location_full (self, mount, NULL);
+}
+#endif
+
 static void
 begin_location_change (NautilusWindowSlot *self,
                        GFile              *location,
@@ -1514,6 +1556,22 @@ begin_location_change (NautilusWindowSlot *self,
 {
     g_assert (self != NULL);
     g_assert (location != NULL);
+
+#ifdef __APPLE__
+    /* Without GVfs, macOS mounts network shares (under /Volumes) */
+    if (nautilus_macos_is_network_location (location))
+    {
+        NetworkMountData *data = g_new0 (NetworkMountData, 1);
+
+        data->slot = g_object_ref (self);
+        data->server = g_object_ref (location);
+
+        nautilus_window_slot_set_allow_stop (self, TRUE);
+        nautilus_macos_mount_network_location (location, NULL,
+                                               on_network_location_mounted, data);
+        return;
+    }
+#endif
 
     /* We are going to change the location, so make sure we stop any loading
      * or searching of the previous view, so we avoid to be slow */

@@ -291,8 +291,12 @@ if host_machine.system() == 'darwin'
   libnautilus_sources += [
     'nautilus-macos.h',
     'nautilus-macos.m',
+    'nautilus-macos-network.c',
+    'nautilus-macos-network.h',
     'nautilus-macos-trash.c',
     'nautilus-macos-trash.h',
+    'nautilus-macos-volumes.c',
+    'nautilus-macos-volumes.h',
   ]
 endif
 
@@ -328,7 +332,7 @@ nautilus_deps = [
 ]
 
 if host_machine.system() == 'darwin'
-  nautilus_deps += dependency('appleframeworks', modules: ['AppKit', 'QuickLookThumbnailing'])
+  nautilus_deps += dependency('appleframeworks', modules: ['AppKit', 'NetFS', 'QuickLookThumbnailing'])
 endif
 
 libnautilus = static_library(

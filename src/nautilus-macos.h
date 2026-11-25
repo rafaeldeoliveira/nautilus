@@ -20,4 +20,14 @@ GdkPixbuf *nautilus_macos_create_thumbnail    (const char *path,
                                                int         size,
                                                gboolean    allow_icon);
 
+void       nautilus_macos_register_network_schemes (void);
+gboolean   nautilus_macos_is_network_scheme   (const char *scheme);
+gboolean   nautilus_macos_is_network_location (GFile      *location);
+void       nautilus_macos_mount_network_location        (GFile                *location,
+                                                         GCancellable         *cancellable,
+                                                         GAsyncReadyCallback   callback,
+                                                         gpointer              user_data);
+GFile     *nautilus_macos_mount_network_location_finish (GAsyncResult         *result,
+                                                         GError              **error);
+
 G_END_DECLS

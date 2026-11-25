@@ -11,12 +11,18 @@
  *   them instead of showing their contents, and so does Nautilus.
  * - Opening items as Finder does, through Launch Services.
  * - Thumbnails and application icons from Quick Look.
+ * - Network shares (SMB, AFP, NFS, WebDAV, FTP), mounted by macOS under
+ *   /Volumes as in Finder's "Connect to Server", with its login dialog
+ *   and Keychain.
  */
 
 #define G_LOG_DOMAIN "nautilus-macos"
 
 #import <AppKit/AppKit.h>
+#import <NetFS/NetFS.h>
 #import <QuickLookThumbnailing/QuickLookThumbnailing.h>
+
+#include <glib/gi18n.h>
 
 #include "nautilus-macos.h"
 
@@ -183,4 +189,172 @@ nautilus_macos_create_thumbnail (const char *path,
 
         return pixbuf;
     }
+}
+
+/* Network locations macOS can mount, as in Finder's "Connect to Server".
+ * dav:// and davs:// are GVfs's names for WebDAV over http(s). */
+static const char * const network_schemes[] = {
+    "smb", "cifs", "afp", "nfs", "ftp", "dav", "davs", "http", "https", NULL
+};
+
+gboolean
+nautilus_macos_is_network_scheme (const char *scheme)
+{
+    return scheme != NULL && g_strv_contains (network_schemes, scheme);
+}
+
+gboolean
+nautilus_macos_is_network_location (GFile *location)
+{
+    g_autofree char *scheme = g_file_get_uri_scheme (location);
+
+    return nautilus_macos_is_network_scheme (scheme);
+}
+
+/* An unmounted network address. GLib's local VFS gives these "dummy"
+ * files that only remember their URI, which is all that's needed to
+ * mount them; going through the class bypasses our own registration. */
+static GFile *
+lookup_network_uri (GVfs       *vfs,
+                    const char *identifier,
+                    gpointer    user_data)
+{
+    g_autofree char *scheme = g_uri_parse_scheme (identifier);
+
+    if (!nautilus_macos_is_network_scheme (scheme))
+    {
+        return NULL;
+    }
+
+    return G_VFS_GET_CLASS (vfs)->get_file_for_uri (vfs, identifier);
+}
+
+/**
+ * nautilus_macos_register_network_schemes:
+ *
+ * Without GVfs, GLib parses a typed "smb://server/share" as a relative file
+ * name. Registering the network schemes keeps them addresses, which
+ * nautilus_macos_mount_network_location() can then mount.
+ */
+void
+nautilus_macos_register_network_schemes (void)
+{
+    GVfs *vfs = g_vfs_get_default ();
+
+    for (guint i = 0; network_schemes[i] != NULL; i++)
+    {
+        if (!g_strv_contains (g_vfs_get_supported_uri_schemes (vfs), network_schemes[i]))
+        {
+            g_vfs_register_uri_scheme (vfs, network_schemes[i],
+                                       lookup_network_uri, NULL, NULL,
+                                       lookup_network_uri, NULL, NULL);
+        }
+    }
+}
+
+static NSURL *
+netfs_url_for_uri (const char *uri)
+{
+    NSString *string = @(uri);
+
+    if ([string hasPrefix:@"dav://"])
+    {
+        string = [@"http://" stringByAppendingString:[string substringFromIndex:6]];
+    }
+    else if ([string hasPrefix:@"davs://"])
+    {
+        string = [@"https://" stringByAppendingString:[string substringFromIndex:7]];
+    }
+
+    return [NSURL URLWithString:string];
+}
+
+/**
+ * nautilus_macos_mount_network_location:
+ *
+ * Mounts a network share with NetFS, which shows macOS's own login and
+ * share selection dialogs, and keeps passwords in the Keychain. The
+ * result is the folder it was mounted at (under /Volumes).
+ */
+void
+nautilus_macos_mount_network_location (GFile               *location,
+                                       GCancellable        *cancellable,
+                                       GAsyncReadyCallback  callback,
+                                       gpointer             user_data)
+{
+    GTask *task = g_task_new (NULL, cancellable, callback, user_data);
+    g_autofree char *uri = g_file_get_uri (location);
+
+    g_task_set_source_tag (task, nautilus_macos_mount_network_location);
+
+    @autoreleasepool
+    {
+        NSURL *url = netfs_url_for_uri (uri);
+        NSMutableDictionary *open_options = [NSMutableDictionary dictionary];
+        AsyncRequestID request_id = NULL;
+        char *task_uri = g_strdup (uri);
+        int status;
+
+        if (url == nil)
+        {
+            g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                                     _("“%s” is not a valid server address"), uri);
+            g_object_unref (task);
+            g_free (task_uri);
+            return;
+        }
+
+        open_options[(__bridge NSString *) kNAUIOptionKey] = (__bridge NSString *) kNAUIOptionAllowUI;
+
+        status = NetFSMountURLAsync ((__bridge CFURLRef) url, NULL, NULL, NULL,
+                                     (__bridge CFMutableDictionaryRef) open_options, NULL,
+                                     &request_id,
+                                     dispatch_get_global_queue (QOS_CLASS_USER_INITIATED, 0),
+                                     ^(int result, AsyncRequestID request, CFArrayRef mountpoints) {
+            g_autofree char *mountpoint = NULL;
+
+            if (mountpoints != NULL && CFArrayGetCount (mountpoints) > 0)
+            {
+                NSString *path = (__bridge NSString *) CFArrayGetValueAtIndex (mountpoints, 0);
+
+                mountpoint = g_strdup (path.fileSystemRepresentation);
+            }
+
+            if ((result == 0 || result == EEXIST) && mountpoint != NULL)
+            {
+                /* EEXIST: already mounted, which is fine */
+                g_task_return_pointer (task, g_file_new_for_path (mountpoint), g_object_unref);
+            }
+            else if (result == ECANCELED || result == -128 /* userCanceledErr */)
+            {
+                /* The user closed macOS's dialog: nothing to report */
+                g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_FAILED_HANDLED,
+                                         "Cancelled");
+            }
+            else
+            {
+                g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_FAILED,
+                                         _("Could not connect to “%s”: %s"), task_uri,
+                                         result > 0 ? g_strerror (result) : _("the server refused the connection"));
+            }
+
+            g_free (task_uri);
+            g_object_unref (task);
+        });
+
+        if (status != 0)
+        {
+            g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_FAILED,
+                                     _("Could not connect to “%s”: %s"), uri, g_strerror (status));
+            g_object_unref (task);
+            g_free (task_uri);
+        }
+    }
+}
+
+GFile *
+nautilus_macos_mount_network_location_finish (GAsyncResult  *result,
+                                              GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (result), error);
 }

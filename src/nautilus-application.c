@@ -29,6 +29,8 @@
 
 #include "nautilus-application.h"
 #ifdef __APPLE__
+#include "nautilus-macos.h"
+#include "nautilus-macos-network.h"
 #include "nautilus-macos-trash.h"
 #endif
 #include "nautilus-shortcuts.h"
@@ -1090,8 +1092,11 @@ nautilus_application_startup (GApplication *app)
     g_application_set_resource_base_path (G_APPLICATION (self), "/org/gnome/nautilus");
 
 #ifdef __APPLE__
-    /* GVfs, which provides trash:// on Linux, is not available */
+    /* GVfs, which provides trash:// and network locations on Linux, is
+     * not available */
     nautilus_macos_trash_register ();
+    nautilus_macos_register_network_schemes ();
+    nautilus_macos_network_register ();
 #endif
 
     /* Register the app with the host app registry in XDG Desktop Portal before

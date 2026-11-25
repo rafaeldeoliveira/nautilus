@@ -45,6 +45,8 @@
 #include <unistd.h>
 
 #ifdef __APPLE__
+#include "nautilus-macos-volumes.h"
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <xlocale.h>
 
@@ -135,6 +137,8 @@ main (int   argc,
     /* Initialize gettext support */
 #ifdef __APPLE__
     set_locale_from_macos_preferences ();
+    /* Before anything asks GIO for mounts */
+    nautilus_macos_volumes_register ();
 #endif
     setlocale (LC_ALL, "");
     bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);

@@ -743,6 +743,18 @@ get_activation_action (NautilusFile *file)
             return ACTIVATION_ACTION_OPEN_PACKAGE;
         }
     }
+
+    /* Unmounted network addresses (such as servers in the Network view)
+     * have no file info without GVfs: open them as folders, which mounts
+     * them with NetFS. */
+    {
+        g_autoptr (GFile) location = nautilus_file_get_activation_location (file);
+
+        if (location != NULL && nautilus_macos_is_network_location (location))
+        {
+            return ACTIVATION_ACTION_OPEN_IN_VIEW;
+        }
+    }
 #endif
 
     if (nautilus_file_is_archive (file))
