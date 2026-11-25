@@ -1162,6 +1162,27 @@ is_external_volume (GVolume *volume)
 }
 
 /* Checks if the location is an autofs mountpoint without triggering mount.*/
+/* Whether @location is on a read-only filesystem, given its filesystem
+ * info. On macOS, GLib reports every path under / as read-only: / is the
+ * sealed system volume, and home folders are on the data volume, reached
+ * through firmlinks. Ask the volume a native file is actually on instead. */
+gboolean
+nautilus_filesystem_info_is_readonly (GFile     *location,
+                                      GFileInfo *fsinfo)
+{
+#ifdef __APPLE__
+    g_autofree char *path = g_file_get_path (location);
+    struct statfs buf;
+
+    if (path != NULL && statfs (path, &buf) == 0)
+    {
+        return (buf.f_flags & MNT_RDONLY) != 0;
+    }
+#endif
+
+    return g_file_info_get_attribute_boolean (fsinfo, G_FILE_ATTRIBUTE_FILESYSTEM_READONLY);
+}
+
 gboolean
 nautilus_location_is_autofs_mountpoint (GFile *location)
 {

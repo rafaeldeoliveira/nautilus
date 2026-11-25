@@ -3686,8 +3686,9 @@ got_filesystem_info (FilesystemInfoState *state,
     {
         file->details->filesystem_use_preview =
             g_file_info_get_attribute_uint32 (info, G_FILE_ATTRIBUTE_FILESYSTEM_USE_PREVIEW);
-        file->details->filesystem_readonly =
-            g_file_info_get_attribute_boolean (info, G_FILE_ATTRIBUTE_FILESYSTEM_READONLY);
+        g_autoptr (GFile) location = nautilus_file_get_location (file);
+
+        file->details->filesystem_readonly = nautilus_filesystem_info_is_readonly (location, info);
         file->details->filesystem_remote = g_file_info_get_attribute_boolean (info, G_FILE_ATTRIBUTE_FILESYSTEM_REMOTE);
     }
 

@@ -146,6 +146,8 @@ GList *
 nautilus_location_list_from_file_list (GList *files);
 
 gboolean nautilus_location_is_autofs_mountpoint (GFile *location);
+gboolean nautilus_filesystem_info_is_readonly (GFile     *location,
+                                              GFileInfo *fsinfo);
 
 gboolean
 selection_source_is_intentional (NautilusSelectionSource selection_source);

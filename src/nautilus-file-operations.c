@@ -3267,8 +3267,7 @@ verify_destination (CommonJob   *job,
     }
 
     if (!job_aborted (job) &&
-        g_file_info_get_attribute_boolean (fsinfo,
-                                           G_FILE_ATTRIBUTE_FILESYSTEM_READONLY))
+        nautilus_filesystem_info_is_readonly (dest, fsinfo))
     {
         g_autofree gchar *basename = get_basename (dest);
         g_autofree gchar *heading = g_strdup_printf (_("Error while copying to “%s”."), basename);
