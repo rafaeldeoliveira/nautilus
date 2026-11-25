@@ -28,6 +28,9 @@
 #include <config.h>
 
 #include "nautilus-application.h"
+#ifdef __APPLE__
+#include "nautilus-macos-trash.h"
+#endif
 #include "nautilus-shortcuts.h"
 
 #include <adwaita.h>
@@ -1085,6 +1088,11 @@ nautilus_application_startup (GApplication *app)
     NautilusApplication *self = NAUTILUS_APPLICATION (app);
 
     g_application_set_resource_base_path (G_APPLICATION (self), "/org/gnome/nautilus");
+
+#ifdef __APPLE__
+    /* GVfs, which provides trash:// on Linux, is not available */
+    nautilus_macos_trash_register ();
+#endif
 
     /* Register the app with the host app registry in XDG Desktop Portal before
      * we initialize GDK display, which on Wayland uses Settings portal.

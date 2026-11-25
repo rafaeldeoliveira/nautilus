@@ -35,6 +35,9 @@
 #include <stdlib.h>
 
 #include "nautilus-file-operations.h"
+#ifdef __APPLE__
+#include "nautilus-macos-trash.h"
+#endif
 
 #include "nautilus-file-changes-queue.h"
 
@@ -1650,6 +1653,11 @@ trash_file (CommonJob     *job,
         return FALSE;
     }
 
+#ifdef __APPLE__
+    /* macOS doesn't record it in a way we can read back */
+    nautilus_macos_trash_record_origin (file);
+#endif
+
     if (g_file_trash (file, job->cancellable, &error))
     {
         transfer_info->num_files++;
@@ -1986,10 +1994,14 @@ setup_delete_job (GList                          *files,
         inhibit_power_manager ((CommonJob *) job, _("Deleting Files"));
     }
 
-    /* Undoing restores files through trash:///, which needs GVfs (e.g. not
-     * available on macOS, where files still go to the system Trash) */
+    /* Undoing restores files through trash:///, which needs GVfs, or on
+     * macOS, permission to read the trash (Full Disk Access) */
     if (!nautilus_file_undo_manager_is_operating () && try_trash &&
+#ifdef __APPLE__
+        nautilus_macos_trash_is_readable ())
+#else
         g_strv_contains (g_vfs_get_supported_uri_schemes (g_vfs_get_default ()), "trash"))
+#endif
     {
         job->common.undo_info = nautilus_file_undo_info_trash_new (g_list_length (files));
     }
@@ -7530,6 +7542,13 @@ empty_trash_thread_func (GTask        *task,
             }
         }
     }
+#ifdef __APPLE__
+    else if (confirmed && !nautilus_macos_trash_is_readable ())
+    {
+        /* Without Full Disk Access only Finder can empty the trash */
+        nautilus_macos_trash_empty_with_finder ();
+    }
+#endif
     else if (confirmed)
     {
         for (l = job->trash_dirs;

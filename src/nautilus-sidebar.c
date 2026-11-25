@@ -11,6 +11,9 @@
  * nautilus with the GTK4 port in 7bf5ab0c73d5027dbe754df34243054a83ffae1b
  */
 #include "nautilus-sidebar.h"
+#ifdef __APPLE__
+#include "nautilus-macos-trash.h"
+#endif
 #include "nautilus-shortcuts.h"
 
 #include "config.h"
@@ -1851,6 +1854,21 @@ open_row (NautilusSidebarRow *self,
                   "drive", &drive,
                   "volume", &volume,
                   NULL);
+
+#ifdef __APPLE__
+    if (g_strcmp0 (uri, SCHEME_TRASH ":///") == 0 && !nautilus_macos_trash_is_readable ())
+    {
+        /* Listing the trash needs Full Disk Access; Finder can always show it */
+        g_autoptr (GFile) current_location = sidebar->current_location != NULL ?
+                                             g_object_ref (sidebar->current_location) : NULL;
+
+        nautilus_macos_trash_open_in_finder ();
+
+        /* Keep highlighting the location still shown here */
+        nautilus_sidebar_set_location (sidebar, current_location);
+        return;
+    }
+#endif
 
     if (uri != NULL)
     {

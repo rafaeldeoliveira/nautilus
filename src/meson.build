@@ -287,6 +287,13 @@ libnautilus_sources = [
   'nautilus-x-content-bar.h',
 ]
 
+if host_machine.system() == 'darwin'
+  libnautilus_sources += [
+    'nautilus-macos-trash.c',
+    'nautilus-macos-trash.h',
+  ]
+endif
+
 if have_portal
   libnautilus_sources += [
     'nautilus-portal.c',
