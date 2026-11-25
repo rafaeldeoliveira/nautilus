@@ -25,6 +25,8 @@
  */
 #define G_LOG_DOMAIN "nautilus-application"
 
+#include <config.h>
+
 #include "nautilus-application.h"
 
 #include <adwaita.h>
@@ -36,7 +38,9 @@
 #include <glib/gi18n.h>
 #include <glib/gstdio.h>
 #include <gtk/gtk.h>
+#ifdef HAVE_PORTAL
 #include <libportal/portal.h>
+#endif
 #include <nautilus-extension.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -57,7 +61,9 @@
 #include "nautilus-global-preferences.h"
 #include "nautilus-icon-info.h"
 #include "nautilus-module.h"
+#ifdef HAVE_PORTAL
 #include "nautilus-portal.h"
+#endif
 #include "nautilus-preferences-dialog.h"
 #include "nautilus-previewer.h"
 #include "nautilus-progress-persistence-handler.h"
@@ -77,7 +83,9 @@ struct _NautilusApplication
     NautilusProgressPersistenceHandler *progress_handler;
     NautilusDBusManager *dbus_manager;
     NautilusFreedesktopDBus *fdb_manager;
+#ifdef HAVE_PORTAL
     NautilusPortal *portal_implementation;
+#endif
 
     NautilusBookmarkList *bookmark_list;
 
@@ -1073,7 +1081,9 @@ nautilus_application_startup (GApplication *app)
 
     /* Initialize GDK display (for wayland-x11-interop protocol) before GTK does
      * it during the chain-up. */
+#ifdef HAVE_PORTAL
     nautilus_portal_setup_gxdp ();
+#endif
 
     /* Chain up to the GtkApplication implementation early, so that gtk_init()
      * is called for us.
@@ -1140,11 +1150,13 @@ nautilus_application_dbus_register (GApplication     *app,
         return FALSE;
     }
 
+#ifdef HAVE_PORTAL
     self->portal_implementation = nautilus_portal_new ();
     if (!nautilus_portal_register (self->portal_implementation, connection, error))
     {
         return FALSE;
     }
+#endif
 
     self->search_provider = nautilus_shell_search_provider_new ();
     if (!nautilus_shell_search_provider_register (self->search_provider, connection, error))
@@ -1176,11 +1188,13 @@ nautilus_application_dbus_unregister (GApplication    *app,
         g_clear_object (&self->fdb_manager);
     }
 
+#ifdef HAVE_PORTAL
     if (self->portal_implementation != NULL)
     {
         nautilus_portal_unregister (self->portal_implementation);
         g_clear_object (&self->portal_implementation);
     }
+#endif
 
     if (self->search_provider)
     {
@@ -1383,7 +1397,11 @@ nautilus_application_is_sandboxed (void)
     static gsize init = 0;
     if (g_once_init_enter (&init))
     {
+#ifdef HAVE_PORTAL
         ret = xdp_portal_running_under_sandbox ();
+#else
+        ret = g_file_test ("/.flatpak-info", G_FILE_TEST_EXISTS);
+#endif
 
         g_once_init_leave (&init, 1);
     }

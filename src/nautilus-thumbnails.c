@@ -38,6 +38,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
+#ifdef HAVE_GNOME_DESKTOP
 #include <libgnome-desktop/gnome-desktop-thumbnail.h>
 
 /* Should never be a reasonable actual mtime */
@@ -727,3 +728,62 @@ thumbnail_starter_cb (gpointer data)
 
     return G_SOURCE_REMOVE;
 }
+
+#else /* !HAVE_GNOME_DESKTOP */
+
+/* Without gnome-desktop there is no thumbnailer: report that nothing can be
+ * thumbnailed, so files show their type icons instead. */
+
+guint
+nautilus_thumbnail_get_max_size (void)
+{
+    return 256;
+}
+
+char *
+nautilus_thumbnail_get_path_for_uri (const char *uri)
+{
+    /* Same location as gnome-desktop uses for "large" thumbnails, per the
+     * freedesktop.org thumbnail spec, so existing thumbnails are found. */
+    g_autofree char *md5 = g_compute_checksum_for_string (G_CHECKSUM_MD5, uri, -1);
+    g_autofree char *file = g_strconcat (md5, ".png", NULL);
+
+    return g_build_filename (g_get_user_cache_dir (), "thumbnails", "large", file, NULL);
+}
+
+gboolean
+nautilus_thumbnail_is_mimetype_limited_by_size (const char *mime_type)
+{
+    return FALSE;
+}
+
+gboolean
+nautilus_can_thumbnail (const gchar *uri,
+                        const gchar *mime_type,
+                        time_t       modified_time)
+{
+    return FALSE;
+}
+
+void
+nautilus_create_thumbnail_async (const gchar         *uri,
+                                 const gchar         *mime_type,
+                                 time_t               modified_time,
+                                 GCancellable        *cancellable,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+    g_task_report_new_error (NULL, callback, user_data,
+                             nautilus_create_thumbnail_async,
+                             G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                             "Thumbnails are not supported in this build");
+}
+
+GdkPixbuf *
+nautilus_create_thumbnail_finish (GAsyncResult  *res,
+                                  GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
+#endif /* HAVE_GNOME_DESKTOP */

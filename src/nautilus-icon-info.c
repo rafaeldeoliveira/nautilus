@@ -20,8 +20,44 @@
 #include "nautilus-enums.h"
 #include <nautilus-hash-queue.h>
 
+#include <config.h>
+
+#ifdef HAVE_GLYCIN
 #include <glycin.h>
 #include <glycin-gtk4.h>
+#else
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#endif
+
+/* Decodes an image to fit in pixel_size x pixel_size, or returns NULL. */
+static GdkTexture *
+load_texture_from_stream (GInputStream *stream,
+                          int           pixel_size)
+{
+#ifdef HAVE_GLYCIN
+    g_autoptr (GlyLoader) loader = gly_loader_new_for_stream (stream);
+    g_autoptr (GlyImage) image = gly_loader_load (loader, NULL);
+
+    if (image == NULL)
+    {
+        return NULL;
+    }
+
+    g_autoptr (GlyFrameRequest) frame_request = gly_frame_request_new ();
+    g_autoptr (GlyFrame) frame = NULL;
+
+    gly_frame_request_set_scale (frame_request, pixel_size, pixel_size);
+    frame = gly_image_get_specific_frame (image, frame_request, NULL);
+
+    return frame != NULL ? gly_gtk_frame_get_texture (frame) : NULL;
+#else
+    g_autoptr (GdkPixbuf) pixbuf = gdk_pixbuf_new_from_stream_at_scale (stream,
+                                                                        pixel_size, pixel_size,
+                                                                        TRUE, NULL, NULL);
+
+    return pixbuf != NULL ? gdk_texture_new_for_pixbuf (pixbuf) : NULL;
+#endif
+}
 
 static GtkIconPaintable *
 lookup_themed_icon (GIcon *icon,
@@ -356,35 +392,24 @@ nautilus_icon_info_lookup (GIcon *icon,
                                                                 NULL, NULL, NULL);
         if (stream)
         {
-            g_autoptr (GlyLoader) loader = gly_loader_new_for_stream (stream);
-            g_autoptr (GlyImage) image = gly_loader_load (loader, NULL);
+            g_autoptr (GdkTexture) texture = load_texture_from_stream (stream, size * scale);
 
-            if (image != NULL)
+            if (texture != NULL)
             {
-                g_autoptr (GlyFrameRequest) frame_request = gly_frame_request_new ();
-                g_autoptr (GlyFrame) frame = NULL;
+                double iw = gdk_texture_get_width (texture);
+                double ih = gdk_texture_get_height (texture);
 
-                gly_frame_request_set_scale (frame_request, size * scale, size * scale);
-                frame = gly_image_get_specific_frame (image, frame_request, NULL);
+                double scale_factor = MIN ((double) size / iw, (double) size / ih);
 
-                if (frame != NULL)
-                {
-                    double iw = gly_frame_get_width (frame);
-                    double ih = gly_frame_get_height (frame);
+                double width = iw * scale_factor;
+                double height = ih * scale_factor;
 
-                    double scale_factor = MIN ((double) size / iw, (double) size / ih);
+                g_autoptr (GtkSnapshot) snapshot = gtk_snapshot_new ();
 
-                    double width = iw * scale_factor;
-                    double height = ih * scale_factor;
-
-                    g_autoptr (GdkTexture) texture = gly_gtk_frame_get_texture (frame);
-                    g_autoptr (GtkSnapshot) snapshot = gtk_snapshot_new ();
-
-                    gdk_paintable_snapshot (GDK_PAINTABLE (texture),
-                                            GDK_SNAPSHOT (snapshot),
-                                            width, height);
-                    paintable = gtk_snapshot_to_paintable (snapshot, NULL);
-                }
+                gdk_paintable_snapshot (GDK_PAINTABLE (texture),
+                                        GDK_SNAPSHOT (snapshot),
+                                        width, height);
+                paintable = gtk_snapshot_to_paintable (snapshot, NULL);
             }
         }
 

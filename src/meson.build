@@ -189,10 +189,6 @@ libnautilus_sources = [
   'nautilus-operations-ui-manager.h',
   'nautilus-pathbar.c',
   'nautilus-pathbar.h',
-  'nautilus-portal.c',
-  'nautilus-portal.h',
-  'nautilus-portal-request.c',
-  'nautilus-portal-request.h',
   'nautilus-preferences-dialog.c',
   'nautilus-preferences-dialog.h',
   'nautilus-previewer.c',
@@ -289,15 +285,26 @@ libnautilus_sources = [
   'nautilus-x-content-bar.h',
 ]
 
+if have_portal
+  libnautilus_sources += [
+    'nautilus-portal.c',
+    'nautilus-portal.h',
+    'nautilus-portal-request.c',
+    'nautilus-portal-request.h',
+  ]
+endif
+
 nautilus_deps = [
   cloudproviders,
   config_h,
+  gdkpixbuf,
   gio_unix,
   glycin,
   glycin_gtk4,
   gmodule,
   gnome_autoar,
   gnome_desktop,
+  gsettings_desktop_schemas,
   icu_dep,
   icu_i18n_dep,
   libadwaita,

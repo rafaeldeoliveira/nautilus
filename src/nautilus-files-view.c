@@ -24,6 +24,8 @@
  */
 #define G_LOG_DOMAIN "nautilus-view"
 
+#include <config.h>
+
 #include "nautilus-files-view.h"
 
 #include <gdk/gdk.h>
@@ -32,8 +34,10 @@
 #include <glib/gstdio.h>
 #include <gtk/gtk.h>
 #include <gnome-autoar/gnome-autoar.h>
+#ifdef HAVE_PORTAL
 #include <libportal/portal.h>
 #include <libportal-gtk4/portal-gtk4.h>
+#endif
 #include <nautilus-extension.h>
 
 #include "nautilus-application.h"
@@ -1427,6 +1431,7 @@ action_open_item_new_tab (GSimpleAction *action,
                                         TRUE);
 }
 
+#ifdef HAVE_PORTAL
 static void
 sandboxed_choose_program_callback (GObject      *source_object,
                                    GAsyncResult *res,
@@ -1481,6 +1486,7 @@ sandboxed_choose_program (GList     *files,
                          sandboxed_choose_program_callback,
                          g_steal_pointer (&files));
 }
+#endif
 
 static void
 app_choosen (AdwDialog *dialog,
@@ -1513,11 +1519,13 @@ choose_program (NautilusFilesView *view,
 
     parent_window = nautilus_files_view_get_containing_window (view);
 
+#ifdef HAVE_PORTAL
     if (nautilus_application_is_sandboxed ())
     {
         sandboxed_choose_program (g_steal_pointer (&files), parent_window);
         return;
     }
+#endif
 
     dialog = nautilus_app_chooser_new (files);
     g_object_set_data_full (G_OBJECT (dialog),
@@ -6305,6 +6313,7 @@ action_compress (GSimpleAction *action,
     nautilus_files_view_compress_dialog_new (view);
 }
 
+#ifdef HAVE_PORTAL
 static void
 send_email_done (GObject      *source_object,
                  GAsyncResult *res,
@@ -6349,6 +6358,14 @@ real_send_email (GStrv              attachments,
                               NULL, NULL, NULL, NULL, (const char * const *) attachments,
                               XDP_EMAIL_FLAG_NONE, NULL, send_email_done, toplevel);
 }
+#else
+static void
+real_send_email (GStrv              attachments,
+                 NautilusFilesView *view)
+{
+    /* Unreachable: "send-email" is disabled without portal support */
+}
+#endif
 
 static void
 email_archive_ready (GFile    *new_file,
@@ -6501,9 +6518,15 @@ can_set_wallpaper (NautilusFileList *selection)
 
     /* FIXME: check file size? */
 
+#ifdef HAVE_PORTAL
     return TRUE;
+#else
+    /* Wallpapers are set through the portal */
+    return FALSE;
+#endif
 }
 
+#ifdef HAVE_PORTAL
 static void
 set_wallpaper_with_portal_cb (GObject      *source,
                               GAsyncResult *result,
@@ -6550,6 +6573,7 @@ set_wallpaper_with_portal (NautilusFile *file,
                               NULL);
     xdp_parent_free (parent);
 }
+#endif
 
 static void
 action_set_as_wallpaper (GSimpleAction *action,
@@ -6563,11 +6587,11 @@ action_set_as_wallpaper (GSimpleAction *action,
     selection = nautilus_files_view_get_selection (user_data);
     if (can_set_wallpaper (selection))
     {
-        NautilusFile *file;
-
-        file = NAUTILUS_FILE (selection->data);
+#ifdef HAVE_PORTAL
+        NautilusFile *file = NAUTILUS_FILE (selection->data);
 
         set_wallpaper_with_portal (file, user_data);
+#endif
     }
 }
 
@@ -7567,6 +7591,9 @@ nautilus_files_view_update_actions_state (NautilusFilesView *self)
                                          "send-email");
     g_simple_action_set_enabled (G_SIMPLE_ACTION (action),
                                  mode == NAUTILUS_MODE_BROWSE &&
+#ifndef HAVE_PORTAL
+                                 FALSE &&
+#endif
                                  app_info_mailto != NULL);
     action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group),
                                          "copy-to");

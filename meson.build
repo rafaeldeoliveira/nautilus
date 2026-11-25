@@ -103,26 +103,31 @@ glib_ver = '>= 2.89.0'
 
 libm = cc.find_library('m')
 
-subproject('libgxdp',
-  default_options: [
-    'tests=false',
-    'werror=false',
-  ],
-)
+if get_option('portal').allowed()
+  subproject('libgxdp',
+    default_options: [
+      'tests=false',
+      'werror=false',
+    ],
+    required: get_option('portal'),
+  )
+endif
 
 gio = dependency('gio-2.0', version: glib_ver)
 gio_unix = dependency('gio-unix-2.0', version: glib_ver)
 glib = dependency('glib-2.0', version: glib_ver)
-glycin = dependency('glycin-2', version: '>= 2')
-glycin_gtk4 = dependency('glycin-gtk4-2', version: '>= 2')
+glycin = dependency('glycin-2', version: '>= 2', required: get_option('glycin'))
+glycin_gtk4 = dependency('glycin-gtk4-2', version: '>= 2', required: get_option('glycin'))
 gmodule = dependency('gmodule-no-export-2.0', version: glib_ver)
 gnome_autoar = dependency('gnome-autoar-0', version: '>= 0.4.4')
-gnome_desktop = dependency('gnome-desktop-4', version: '>= 43')
+gsettings_desktop_schemas = dependency('gsettings-desktop-schemas')
+gnome_desktop = dependency('gnome-desktop-4', version: '>= 43', required: get_option('thumbnails'))
 gtk = dependency('gtk4', version: '>= 4.24.0')
 libadwaita = dependency('libadwaita-1', version: '>= 1.8.alpha')
-libgxdp = dependency('libgxdp')
-libportal = dependency('libportal', version: '>= 0.7')
-libportal_gtk4 = dependency('libportal-gtk4', version: '>= 0.5')
+libgxdp = dependency('libgxdp', required: get_option('portal'))
+libportal = dependency('libportal', version: '>= 0.7', required: get_option('portal'))
+libportal_gtk4 = dependency('libportal-gtk4', version: '>= 0.5', required: get_option('portal'))
+have_portal = libgxdp.found() and libportal.found() and libportal_gtk4.found()
 tinysparql = dependency('tinysparql-3.0', version: '>= 3.8')
 icu_dep = dependency('icu-uc', version: '>=56')
 icu_i18n_dep = dependency('icu-i18n', version: '>=56')
@@ -131,9 +136,11 @@ blueprint_cmd = find_program('blueprint-compiler', required : true, version : '>
 gi_docgen = find_program('gi-docgen', required: get_option('docs'))
 selinux = dependency('libselinux', version: '>= 2.0', required: get_option('selinux'))
 cloudproviders = dependency('cloudproviders', version: '>= 0.3.1', required: get_option('cloudproviders'))
+# Without glycin, images are loaded with gdk-pixbuf
+gdkpixbuf = dependency('gdk-pixbuf-2.0', version: '>= 2.30.0',
+  required: get_option('extensions') or not glycin.found())
 if get_option('extensions')
   gexiv = dependency('gexiv2-0.16', version: '>= 0.16.0')
-  gdkpixbuf = dependency('gdk-pixbuf-2.0', version: '>= 2.30.0')
   gst_tag_dep = dependency('gstreamer-tag-1.0')
   gst_pbutils_dep = dependency('gstreamer-pbutils-1.0')
 endif
@@ -178,6 +185,9 @@ conf.set_quoted('VERSION', version_string)
 
 conf.set('HAVE_SELINUX', selinux.found())
 conf.set('HAVE_CLOUDPROVIDERS', cloudproviders.found())
+conf.set('HAVE_GLYCIN', glycin.found())
+conf.set('HAVE_GNOME_DESKTOP', gnome_desktop.found())
+conf.set('HAVE_PORTAL', have_portal)
 
 conf.set('HAVE_MALLOC_TRIM', cc.has_function('malloc_trim'))
 

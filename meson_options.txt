@@ -45,6 +45,24 @@ option(
   deprecated: {'true': 'enabled', 'false': 'disabled'},
   description: 'Enable the cloudproviders support',
 )
+option(
+  'glycin',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Load images with glycin (if disabled, gdk-pixbuf is used)',
+)
+option(
+  'thumbnails',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Generate thumbnails with gnome-desktop',
+)
+option(
+  'portal',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Use XDG desktop portals (libportal) and provide the file chooser portal',
+)
 ################
 # End features #
 ################

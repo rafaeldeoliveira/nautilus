@@ -21,11 +21,17 @@
 
 #include "nautilus-properties.h"
 
+#include <config.h>
+
 #include <adwaita.h>
 #include <gdk/gdkkeysyms.h>
 #include <gio/gunixmounts.h>
 #include <glib/gi18n.h>
+#ifdef HAVE_GLYCIN
 #include <glycin.h>
+#else
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#endif
 #include <gtk/gtk.h>
 #include <nautilus-extension.h>
 #include <string.h>
@@ -615,14 +621,11 @@ reset_icon (NautilusPropertiesWidget *self)
 }
 
 static void
-icon_loaded (GlyLoader                *loader,
-             GAsyncResult             *result,
-             NautilusPropertiesWidget *self)
+icon_load_finished (NautilusPropertiesWidget *self,
+                    GError                   *error)
 {
     NautilusFile *file = get_file (self);
-    g_autoptr (GError) error = NULL;
     g_autoptr (GFile) icon_location = g_steal_pointer (&self->icon_pending_location);
-    g_autoptr (GlyImage) image = gly_loader_load_finish (loader, result, &error);
 
     gtk_stack_set_visible_child (self->icon_stack, self->icon_overlay);
 
@@ -651,12 +654,27 @@ icon_loaded (GlyLoader                *loader,
     nautilus_file_set_metadata (file, NAUTILUS_METADATA_KEY_CUSTOM_ICON, NULL, path);
 }
 
+/* The image is only loaded to check that it can be used as an icon */
+static void
+icon_loaded (GObject      *source,
+             GAsyncResult *result,
+             gpointer      user_data)
+{
+    NautilusPropertiesWidget *self = user_data;
+    g_autoptr (GError) error = NULL;
+#ifdef HAVE_GLYCIN
+    g_autoptr (GlyImage) image = gly_loader_load_finish (GLY_LOADER (source), result, &error);
+#else
+    g_autoptr (GdkPixbuf) image = gdk_pixbuf_new_from_stream_finish (result, &error);
+#endif
+
+    icon_load_finished (self, error);
+}
+
 static void
 set_icon (NautilusPropertiesWidget *self,
           GFile                    *location)
 {
-    g_autoptr (GlyLoader) loader = gly_loader_new (location);
-
     if (self->icon_cancellable != NULL)
     {
         g_cancellable_cancel (self->icon_cancellable);
@@ -666,7 +684,24 @@ set_icon (NautilusPropertiesWidget *self,
     g_set_object (&self->icon_pending_location, location);
 
     gtk_stack_set_visible_child_name (self->icon_stack, "loading");
-    gly_loader_load_async (loader, self->icon_cancellable, (GAsyncReadyCallback) icon_loaded, self);
+
+#ifdef HAVE_GLYCIN
+    g_autoptr (GlyLoader) loader = gly_loader_new (location);
+
+    gly_loader_load_async (loader, self->icon_cancellable, icon_loaded, self);
+#else
+    g_autoptr (GError) error = NULL;
+    g_autoptr (GFileInputStream) stream = g_file_read (location, self->icon_cancellable, &error);
+
+    if (stream == NULL)
+    {
+        icon_load_finished (self, error);
+        return;
+    }
+
+    gdk_pixbuf_new_from_stream_async (G_INPUT_STREAM (stream), self->icon_cancellable,
+                                      icon_loaded, self);
+#endif
 }
 
 static void
@@ -3991,7 +4026,21 @@ select_image_button_callback (GtkWidget                *widget,
 {
     g_autoptr (GtkFileDialog) dialog = gtk_file_dialog_new ();
     g_autoptr (GtkFileFilter) filter = gtk_file_filter_new ();
+#ifdef HAVE_GLYCIN
     g_auto (GStrv) mime_types = gly_loader_get_mime_types ();
+#else
+    g_autoptr (GStrvBuilder) mime_builder = g_strv_builder_new ();
+    g_autoptr (GSList) formats = gdk_pixbuf_get_formats ();
+
+    for (GSList *l = formats; l != NULL; l = l->next)
+    {
+        g_auto (GStrv) format_types = gdk_pixbuf_format_get_mime_types (l->data);
+
+        g_strv_builder_addv (mime_builder, (const char **) format_types);
+    }
+
+    g_auto (GStrv) mime_types = g_strv_builder_end (mime_builder);
+#endif
     NautilusFile *file = get_file (self);
 
     gtk_file_dialog_set_title (dialog, _("Select Custom Icon"));
