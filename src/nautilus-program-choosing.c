@@ -30,7 +30,9 @@
 #include <gtk/gtk.h>
 #include <glib/gi18n.h>
 #include <gio/gio.h>
+#if __has_include (<gio/gdesktopappinfo.h>)
 #include <gio/gdesktopappinfo.h>
+#endif
 #include <stdlib.h>
 
 #include <gdk/gdk.h>

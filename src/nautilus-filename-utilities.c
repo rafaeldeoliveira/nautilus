@@ -11,6 +11,27 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __APPLE__
+/* memrchr() is a GNU extension, missing on macOS */
+static void *
+memrchr (const void *s,
+         int         c,
+         size_t      n)
+{
+    const unsigned char *p = (const unsigned char *) s + n;
+
+    while (p-- != (const unsigned char *) s)
+    {
+        if (*p == (unsigned char) c)
+        {
+            return (void *) p;
+        }
+    }
+
+    return NULL;
+}
+#endif
+
 
 typedef gboolean (* AppendixParser) (const char *appendix,
                                      size_t      appendix_len,

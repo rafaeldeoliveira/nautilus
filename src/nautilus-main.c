@@ -32,7 +32,9 @@
 
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
+#if __has_include (<gio/gdesktopappinfo.h>)
 #include <gio/gdesktopappinfo.h>
+#endif
 
 #include <locale.h>
 #ifdef HAVE_MALLOC_H

@@ -16,3 +16,5 @@ build/
 # Ignore captures
 /*.syscap
 /heaptrack.nautilus.*
+_build
+_install
