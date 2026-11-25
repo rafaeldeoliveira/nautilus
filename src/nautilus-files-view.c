@@ -28,6 +28,9 @@
 
 #include "nautilus-files-view.h"
 #include "nautilus-shortcuts.h"
+#ifdef __APPLE__
+#include "nautilus-macos.h"
+#endif
 
 #include <gdk/gdk.h>
 #include <gio/gio.h>
@@ -1370,6 +1373,26 @@ action_open_with_default_application (GSimpleAction *action,
 
     view = NAUTILUS_FILES_VIEW (user_data);
     nautilus_files_view_activate_selection (view, 0);
+}
+
+/* Browses inside a package (such as an application), which otherwise
+ * opens as a single item, like Finder's "Show Package Contents" */
+static void
+action_show_package_contents (GSimpleAction *action,
+                              GVariant      *state,
+                              gpointer       user_data)
+{
+    NautilusFilesView *self = user_data;
+    g_autolist (NautilusFile) selection = nautilus_files_view_get_selection (self);
+    g_autoptr (GFile) location = NULL;
+
+    if (!list_len_is_one (selection))
+    {
+        return;
+    }
+
+    location = nautilus_file_get_location (NAUTILUS_FILE (selection->data));
+    nautilus_window_slot_open_location_full (self->slot, location, NULL);
 }
 
 static void
@@ -6942,6 +6965,7 @@ const GActionEntry view_entries[] =
     { .name = "new-folder-with-selection", .activate = action_new_folder_with_selection },
     { .name = "open-scripts-folder", .activate = action_open_scripts_folder },
     { .name = "open-item-location", .activate = action_open_item_location },
+    { .name = "show-package-contents", .activate = action_show_package_contents },
     { .name = "open-with-default-application", .activate = action_open_with_default_application },
     { .name = "open-with-other-application", .activate = action_open_with_other_application },
     {
@@ -7459,6 +7483,27 @@ nautilus_files_view_update_actions_state (NautilusFilesView *self)
     g_simple_action_set_enabled (G_SIMPLE_ACTION (action),
                                  mode == NAUTILUS_MODE_BROWSE &&
                                  can_create_files && can_copy_files);
+
+    action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group),
+                                         "show-package-contents");
+#ifdef __APPLE__
+    {
+        gboolean is_package = FALSE;
+
+        if (mode == NAUTILUS_MODE_BROWSE &&
+            list_len_is_one (selection) &&
+            nautilus_file_is_directory (NAUTILUS_FILE (selection->data)))
+        {
+            g_autoptr (GFile) location = nautilus_file_get_location (NAUTILUS_FILE (selection->data));
+
+            is_package = nautilus_macos_location_is_package (location);
+        }
+
+        g_simple_action_set_enabled (G_SIMPLE_ACTION (action), is_package);
+    }
+#else
+    g_simple_action_set_enabled (G_SIMPLE_ACTION (action), FALSE);
+#endif
 
     action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group),
                                          "open-item-location");

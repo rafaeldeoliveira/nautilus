@@ -729,6 +729,202 @@ thumbnail_starter_cb (gpointer data)
     return G_SOURCE_REMOVE;
 }
 
+#elif defined (__APPLE__)
+
+/* On macOS, thumbnails come from Quick Look, which also provides the icons
+ * of applications and other packages. They are cached like gnome-desktop
+ * does, following the freedesktop.org thumbnail spec, so GLib finds them
+ * (thumbnail::path) and they are only made once. */
+
+#include "nautilus-macos.h"
+
+#include <glib/gstdio.h>
+
+/* "x-large" in the thumbnail spec: sharp on Retina displays */
+#define THUMBNAIL_SIZE 512
+#define THUMBNAIL_SIZE_DIRECTORY "x-large"
+
+/* Files Quick Look could not thumbnail, until they change: uri → mtime */
+static GHashTable *failed_thumbnails = NULL;
+static GMutex failed_thumbnails_mutex;
+
+static gboolean
+thumbnail_failed_before (const char *uri,
+                         time_t      mtime)
+{
+    gpointer failed_mtime;
+    gboolean result;
+
+    g_mutex_lock (&failed_thumbnails_mutex);
+    result = failed_thumbnails != NULL &&
+             g_hash_table_lookup_extended (failed_thumbnails, uri, NULL, &failed_mtime) &&
+             GPOINTER_TO_SIZE (failed_mtime) == (gsize) mtime;
+    g_mutex_unlock (&failed_thumbnails_mutex);
+
+    return result;
+}
+
+static void
+remember_failed_thumbnail (const char *uri,
+                           time_t      mtime)
+{
+    g_mutex_lock (&failed_thumbnails_mutex);
+    if (failed_thumbnails == NULL)
+    {
+        failed_thumbnails = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
+    }
+    g_hash_table_insert (failed_thumbnails, g_strdup (uri), GSIZE_TO_POINTER ((gsize) mtime));
+    g_mutex_unlock (&failed_thumbnails_mutex);
+}
+
+guint
+nautilus_thumbnail_get_max_size (void)
+{
+    return THUMBNAIL_SIZE;
+}
+
+char *
+nautilus_thumbnail_get_path_for_uri (const char *uri)
+{
+    g_autofree char *md5 = g_compute_checksum_for_string (G_CHECKSUM_MD5, uri, -1);
+    g_autofree char *file = g_strconcat (md5, ".png", NULL);
+
+    return g_build_filename (g_get_user_cache_dir (), "thumbnails",
+                             THUMBNAIL_SIZE_DIRECTORY, file, NULL);
+}
+
+gboolean
+nautilus_thumbnail_is_mimetype_limited_by_size (const char *mime_type)
+{
+    /* Quick Look reads only what it needs */
+    return FALSE;
+}
+
+gboolean
+nautilus_can_thumbnail (const gchar *uri,
+                        const gchar *mime_type,
+                        time_t       modified_time)
+{
+    g_autoptr (GFile) location = g_file_new_for_uri (uri);
+    g_autofree char *path = g_file_get_path (location);
+
+    if (path == NULL || thumbnail_failed_before (uri, modified_time))
+    {
+        return FALSE;
+    }
+
+    /* Folders keep their icon, but packages (applications…) are shown as
+     * items, with their own icon or a preview */
+    if (g_file_test (path, G_FILE_TEST_IS_DIR))
+    {
+        return nautilus_macos_path_is_package (path);
+    }
+
+    /* Quick Look decides; types it can't preview fail once and keep their icon */
+    return TRUE;
+}
+
+typedef struct
+{
+    char *uri;
+    time_t mtime;
+} ThumbnailRequest;
+
+static void
+thumbnail_request_free (ThumbnailRequest *request)
+{
+    g_free (request->uri);
+    g_free (request);
+}
+
+static void
+save_thumbnail (GdkPixbuf  *pixbuf,
+                const char *uri,
+                const char *mtime)
+{
+    g_autofree char *path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree char *directory = g_path_get_dirname (path);
+    g_autofree char *temporary = g_strconcat (path, ".tmp", NULL);
+    g_autoptr (GError) error = NULL;
+
+    if (g_mkdir_with_parents (directory, 0700) != 0)
+    {
+        return;
+    }
+
+    if (!gdk_pixbuf_save (pixbuf, temporary, "png", &error,
+                          "tEXt::Thumb::URI", uri,
+                          "tEXt::Thumb::MTime", mtime,
+                          "tEXt::Software", "GNOME Files (Quick Look)",
+                          NULL) ||
+        g_rename (temporary, path) != 0)
+    {
+        g_debug ("Could not save the thumbnail for %s: %s", uri,
+                 error != NULL ? error->message : g_strerror (errno));
+        g_unlink (temporary);
+    }
+}
+
+static void
+create_thumbnail_thread (GTask        *task,
+                         gpointer      source_object,
+                         gpointer      task_data,
+                         GCancellable *cancellable)
+{
+    ThumbnailRequest *request = task_data;
+    g_autoptr (GFile) location = g_file_new_for_uri (request->uri);
+    g_autofree char *path = g_file_get_path (location);
+    g_autofree char *mtime = g_strdup_printf ("%" G_GINT64_FORMAT, (gint64) request->mtime);
+    GdkPixbuf *pixbuf = NULL;
+
+    if (path != NULL)
+    {
+        gboolean is_package = g_file_test (path, G_FILE_TEST_IS_DIR);
+
+        pixbuf = nautilus_macos_create_thumbnail (path, THUMBNAIL_SIZE, is_package);
+    }
+
+    if (pixbuf == NULL)
+    {
+        remember_failed_thumbnail (request->uri, request->mtime);
+        g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                                 "Quick Look has no thumbnail for %s", request->uri);
+        return;
+    }
+
+    save_thumbnail (pixbuf, request->uri, mtime);
+    /* Lets callers check that the thumbnail is current */
+    gdk_pixbuf_set_option (pixbuf, "tEXt::Thumb::MTime", mtime);
+
+    g_task_return_pointer (task, pixbuf, g_object_unref);
+}
+
+void
+nautilus_create_thumbnail_async (const gchar         *uri,
+                                 const gchar         *mime_type,
+                                 time_t               modified_time,
+                                 GCancellable        *cancellable,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
+{
+    g_autoptr (GTask) task = g_task_new (NULL, cancellable, callback, user_data);
+    ThumbnailRequest *request = g_new0 (ThumbnailRequest, 1);
+
+    request->uri = g_strdup (uri);
+    request->mtime = modified_time;
+
+    g_task_set_source_tag (task, nautilus_create_thumbnail_async);
+    g_task_set_task_data (task, request, (GDestroyNotify) thumbnail_request_free);
+    g_task_run_in_thread (task, create_thumbnail_thread);
+}
+
+GdkPixbuf *
+nautilus_create_thumbnail_finish (GAsyncResult  *res,
+                                  GError       **error)
+{
+    return g_task_propagate_pointer (G_TASK (res), error);
+}
+
 #else /* !HAVE_GNOME_DESKTOP */
 
 /* Without gnome-desktop there is no thumbnailer: report that nothing can be

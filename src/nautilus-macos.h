@@ -1,0 +1,23 @@
+/*
+ * Copyright (C) 2026 The GNOME project contributors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#pragma once
+
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#include <gio/gio.h>
+
+G_BEGIN_DECLS
+
+/* macOS integration, implemented with Apple's frameworks (nautilus-macos.m) */
+
+gboolean   nautilus_macos_location_is_package (GFile      *location);
+gboolean   nautilus_macos_path_is_package     (const char *path);
+gboolean   nautilus_macos_open_location       (GFile      *location);
+GdkPixbuf *nautilus_macos_create_thumbnail    (const char *path,
+                                               int         size,
+                                               gboolean    allow_icon);
+
+G_END_DECLS

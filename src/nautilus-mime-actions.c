@@ -39,6 +39,10 @@
 #include "nautilus-ui-utilities.h"
 #include "nautilus-window-slot.h"
 
+#ifdef __APPLE__
+#include "nautilus-macos.h"
+#endif
+
 typedef enum
 {
     ACTIVATION_ACTION_LAUNCH,
@@ -46,6 +50,7 @@ typedef enum
     ACTIVATION_ACTION_OPEN_IN_VIEW,
     ACTIVATION_ACTION_OPEN_IN_APPLICATION,
     ACTIVATION_ACTION_EXTRACT,
+    ACTIVATION_ACTION_OPEN_PACKAGE,
     ACTIVATION_ACTION_DO_NOTHING,
 } ActivationAction;
 
@@ -727,6 +732,19 @@ get_activation_action (NautilusFile *file)
     ActivationAction action;
     char *activation_uri;
 
+#ifdef __APPLE__
+    /* Applications and other packages open as in Finder, not as folders */
+    if (nautilus_file_is_directory (file))
+    {
+        g_autoptr (GFile) location = nautilus_file_get_location (file);
+
+        if (nautilus_macos_location_is_package (location))
+        {
+            return ACTIVATION_ACTION_OPEN_PACKAGE;
+        }
+    }
+#endif
+
     if (nautilus_file_is_archive (file))
     {
         g_autoptr (GAppInfo) app_info = nautilus_mime_get_default_application_for_file (file);
@@ -842,7 +860,8 @@ nautilus_mime_file_opens_in_external_app (NautilusFile *file)
 
     activation_action = get_activation_action (file);
 
-    return (activation_action == ACTIVATION_ACTION_OPEN_IN_APPLICATION);
+    return (activation_action == ACTIVATION_ACTION_OPEN_IN_APPLICATION ||
+            activation_action == ACTIVATION_ACTION_OPEN_PACKAGE);
 }
 
 
@@ -1576,6 +1595,19 @@ activate_files (ActivateParameters *parameters)
             case ACTIVATION_ACTION_OPEN_IN_APPLICATION:
             {
                 g_queue_push_tail (parameters->open_in_app_uris, location->uri);
+            }
+            break;
+
+            case ACTIVATION_ACTION_OPEN_PACKAGE:
+            {
+#ifdef __APPLE__
+                g_autoptr (GFile) package = g_file_new_for_uri (location->uri);
+
+                if (!nautilus_macos_open_location (package))
+                {
+                    g_warning ("Could not open %s", location->uri);
+                }
+#endif
             }
             break;
 

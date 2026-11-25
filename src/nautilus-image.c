@@ -541,7 +541,12 @@ nautilus_image_set_texture (NautilusImage *self,
             gtk_widget_queue_draw (GTK_WIDGET (self));
         }
 
-        if (texture != NULL)
+        /* Folders only get one for packages, such as applications on macOS:
+         * it's their icon, so it isn't framed like a thumbnail. */
+        gboolean is_icon = self->source_content_type != NULL &&
+                           g_content_type_is_mime_type (self->source_content_type, "inode/directory");
+
+        if (texture != NULL && !is_icon)
         {
             gtk_widget_add_css_class (GTK_WIDGET (self), "file-thumbnail");
         }

@@ -289,6 +289,8 @@ libnautilus_sources = [
 
 if host_machine.system() == 'darwin'
   libnautilus_sources += [
+    'nautilus-macos.h',
+    'nautilus-macos.m',
     'nautilus-macos-trash.c',
     'nautilus-macos-trash.h',
   ]
@@ -324,6 +326,10 @@ nautilus_deps = [
   selinux,
   tinysparql,
 ]
+
+if host_machine.system() == 'darwin'
+  nautilus_deps += dependency('appleframeworks', modules: ['AppKit', 'QuickLookThumbnailing'])
+endif
 
 libnautilus = static_library(
   'nautilus',

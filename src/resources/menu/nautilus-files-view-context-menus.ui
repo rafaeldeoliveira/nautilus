@@ -119,6 +119,11 @@
         <attribute name="action">view.open-item-location</attribute>
         <attribute name="hidden-when">action-disabled</attribute>
       </item>
+      <item>
+        <attribute name="label" translatable="yes">Show Package _Contents</attribute>
+        <attribute name="action">view.show-package-contents</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
       <submenu>
         <attribute name="show-in-mode">browse</attribute>
         <attribute name="show-in-view">normal</attribute>

@@ -41,6 +41,13 @@ servicedir = join_paths(datadir, 'dbus-1', 'services')
 
 cc = meson.get_compiler('c')
 
+# macOS integration (src/nautilus-macos.m) uses Apple's frameworks
+if host_machine.system() == 'darwin'
+  add_languages('objc', native: false, required: true)
+  # Callbacks commonly ignore parameters, as for C below
+  add_project_arguments('-fobjc-arc', '-Wno-unused-parameter', language: 'objc')
+endif
+
 #################
 # End compilers #
 #################
