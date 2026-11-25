@@ -54,6 +54,13 @@ get_path_text (NautilusFile *file,
     }
 
     g_autofree gchar *path = nautilus_file_get_string_attribute_q (file, path_attribute_q);
+
+    if (path == NULL)
+    {
+        /* E.g. trashed items whose original location isn't known */
+        return NULL;
+    }
+
     g_autoptr (GFile) dir_location = g_file_new_for_commandline_arg (path);
 
     if (base_location != NULL && g_file_equal (base_location, dir_location))
