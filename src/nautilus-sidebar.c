@@ -640,6 +640,16 @@ on_account_updated (GObject    *object,
 
 #endif
 
+/* Trash and network locations are provided by GVfs, which is not
+ * available everywhere (e.g. on macOS) */
+static gboolean
+vfs_supports_scheme (const char *scheme)
+{
+    const char * const *schemes = g_vfs_get_supported_uri_schemes (g_vfs_get_default ());
+
+    return g_strv_contains (schemes, scheme);
+}
+
 static void
 update_places (NautilusSidebar *sidebar)
 {
@@ -738,16 +748,19 @@ update_places (NautilusSidebar *sidebar)
     }
 
     /* Network view */
-    start_icon = g_themed_icon_new_with_default_fallbacks (ICON_NAME_NETWORK_VIEW);
-    add_place (sidebar, NAUTILUS_SIDEBAR_ROW_BUILT_IN,
-               NAUTILUS_SIDEBAR_SECTION_DEFAULT_LOCATIONS,
-               _("Network"), start_icon, NULL, SCHEME_NETWORK_VIEW ":///",
-               NULL, NULL, NULL, NULL, 0,
-               _("Open Network Locations"));
-    g_object_unref (start_icon);
+    if (vfs_supports_scheme (SCHEME_NETWORK))
+    {
+        start_icon = g_themed_icon_new_with_default_fallbacks (ICON_NAME_NETWORK_VIEW);
+        add_place (sidebar, NAUTILUS_SIDEBAR_ROW_BUILT_IN,
+                   NAUTILUS_SIDEBAR_SECTION_DEFAULT_LOCATIONS,
+                   _("Network"), start_icon, NULL, SCHEME_NETWORK_VIEW ":///",
+                   NULL, NULL, NULL, NULL, 0,
+                   _("Open Network Locations"));
+        g_object_unref (start_icon);
+    }
 
     /* Trash */
-    if (sidebar->show_trash)
+    if (sidebar->show_trash && vfs_supports_scheme (SCHEME_TRASH))
     {
         start_icon = nautilus_trash_monitor_get_symbolic_icon ();
         sidebar->trash_row = add_place (sidebar, NAUTILUS_SIDEBAR_ROW_BUILT_IN,

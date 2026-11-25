@@ -1986,7 +1986,10 @@ setup_delete_job (GList                          *files,
         inhibit_power_manager ((CommonJob *) job, _("Deleting Files"));
     }
 
-    if (!nautilus_file_undo_manager_is_operating () && try_trash)
+    /* Undoing restores files through trash:///, which needs GVfs (e.g. not
+     * available on macOS, where files still go to the system Trash) */
+    if (!nautilus_file_undo_manager_is_operating () && try_trash &&
+        g_strv_contains (g_vfs_get_supported_uri_schemes (g_vfs_get_default ()), "trash"))
     {
         job->common.undo_info = nautilus_file_undo_info_trash_new (g_list_length (files));
     }
