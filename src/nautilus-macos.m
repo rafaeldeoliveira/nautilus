@@ -14,6 +14,7 @@
  * - Network shares (SMB, AFP, NFS, WebDAV, FTP), mounted by macOS under
  *   /Volumes as in Finder's "Connect to Server", with its login dialog
  *   and Keychain.
+ * - Dragging files to other applications.
  */
 
 #define G_LOG_DOMAIN "nautilus-macos"
@@ -357,4 +358,101 @@ nautilus_macos_mount_network_location_finish (GAsyncResult  *result,
                                               GError       **error)
 {
     return g_task_propagate_pointer (G_TASK (result), error);
+}
+
+/* Dragging files to other applications
+ *
+ * GTK puts a drag on the macOS pasteboard as a single item, giving the
+ * whole text/uri-list ("file:///a\r\nfile:///b\r\n") as its file URL.
+ * That isn't a valid URL, so Finder and other applications refuse the
+ * drop. macOS expects one item per file, each with one URL. */
+
+static NSURL *
+url_for_file (GFile *file)
+{
+    g_autofree char *path = g_file_get_path (file);
+
+    return path != NULL ? [NSURL fileURLWithPath:@(path)] : nil;
+}
+
+/**
+ * nautilus_macos_file_drag_content_new:
+ * @files: (element-type GFile): the dragged files
+ *
+ * Returns: (transfer full): content for dragging @files, whose
+ *   text/uri-list is the URL of the first file alone, as macOS expects of
+ *   a pasteboard item. nautilus_macos_file_drag_begin() adds the others.
+ *   Drops within Nautilus get all the files, as a GdkFileList.
+ */
+GdkContentProvider *
+nautilus_macos_file_drag_content_new (GSList *files)
+{
+    GdkContentProvider *file_list = gdk_content_provider_new_typed (GDK_TYPE_FILE_LIST, files);
+    GdkContentProvider *providers[2];
+    g_autoptr (GBytes) bytes = NULL;
+
+    @autoreleasepool
+    {
+        NSURL *url = files != NULL ? url_for_file (files->data) : nil;
+        const char *uri;
+
+        if (url == nil)
+        {
+            return file_list;
+        }
+
+        uri = url.absoluteString.UTF8String;
+        bytes = g_bytes_new (uri, strlen (uri));
+    }
+
+    /* The first provider that has a format provides it */
+    providers[0] = gdk_content_provider_new_for_bytes ("text/uri-list", bytes);
+    providers[1] = file_list;
+
+    return gdk_content_provider_new_union (providers, G_N_ELEMENTS (providers));
+}
+
+/**
+ * nautilus_macos_file_drag_begin:
+ *
+ * Adds the files after the first of a drag started with content from
+ * nautilus_macos_file_drag_content_new() to the drag pasteboard, one
+ * item each. Call it when the drag has begun.
+ */
+void
+nautilus_macos_file_drag_begin (GdkDrag *drag)
+{
+    GdkContentProvider *content = gdk_drag_get_content (drag);
+    g_auto (GValue) value = G_VALUE_INIT;
+    GSList *files;
+
+    g_value_init (&value, GDK_TYPE_FILE_LIST);
+    if (content == NULL || !gdk_content_provider_get_value (content, &value, NULL))
+    {
+        return;
+    }
+
+    files = g_value_get_boxed (&value);
+    if (files == NULL || files->next == NULL)
+    {
+        return;
+    }
+
+    @autoreleasepool
+    {
+        NSMutableArray<NSURL *> *urls = [NSMutableArray array];
+
+        for (GSList *l = files->next; l != NULL; l = l->next)
+        {
+            NSURL *url = url_for_file (l->data);
+
+            if (url != nil)
+            {
+                [urls addObject:url];
+            }
+        }
+
+        /* Appends to the item GTK wrote */
+        [[NSPasteboard pasteboardWithName:NSPasteboardNameDrag] writeObjects:urls];
+    }
 }

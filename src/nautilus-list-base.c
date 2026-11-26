@@ -21,6 +21,10 @@
 #include "nautilus-global-preferences.h"
 #include "nautilus-thumbnails.h"
 
+#ifdef __APPLE__
+#include "nautilus-macos.h"
+#endif
+
 #ifdef GDK_WINDOWING_X11
 #include <gdk/x11/gdkx.h>
 #endif
@@ -473,8 +477,23 @@ on_item_drag_prepare (GtkDragSource *source,
 
     gtk_drag_source_set_icon (source, paintable, 0, 0);
 
+#ifdef __APPLE__
+    /* Lets files be dropped in other applications */
+    return nautilus_macos_file_drag_content_new (file_list);
+#else
     return gdk_content_provider_new_typed (GDK_TYPE_FILE_LIST, file_list);
+#endif
 }
+
+#ifdef __APPLE__
+static void
+on_item_drag_begin (GtkDragSource *source,
+                    GdkDrag       *drag,
+                    gpointer       user_data)
+{
+    nautilus_macos_file_drag_begin (drag);
+}
+#endif
 
 static void
 hover_timer (gpointer user_data)
@@ -905,6 +924,9 @@ setup_cell_common (GObject          *listitem,
     gtk_widget_add_controller (GTK_WIDGET (cell), controller);
     gtk_event_controller_set_propagation_phase (controller, GTK_PHASE_CAPTURE);
     g_signal_connect (controller, "prepare", G_CALLBACK (on_item_drag_prepare), cell);
+#ifdef __APPLE__
+    g_signal_connect (controller, "drag-begin", G_CALLBACK (on_item_drag_begin), NULL);
+#endif
 
     /* TODO: Implement GDK_ACTION_ASK */
     drop_target = gtk_drop_target_new (G_TYPE_INVALID, GDK_ACTION_ALL);

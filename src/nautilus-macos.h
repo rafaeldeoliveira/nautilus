@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <gdk/gdk.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <gio/gio.h>
 
@@ -29,5 +30,8 @@ void       nautilus_macos_mount_network_location        (GFile                *l
                                                          gpointer              user_data);
 GFile     *nautilus_macos_mount_network_location_finish (GAsyncResult         *result,
                                                          GError              **error);
+
+GdkContentProvider *nautilus_macos_file_drag_content_new (GSList  *files);
+void       nautilus_macos_file_drag_begin       (GdkDrag *drag);
 
 G_END_DECLS
